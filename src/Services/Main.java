@@ -5,6 +5,8 @@ import Models.Borrowings;
 import Models.Members;
 
 import java.sql.*;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.InputMismatchException;
 import java.util.List;
 import java.util.Scanner;
@@ -24,7 +26,10 @@ public class Main {
                 System.out.println("2. Work with library members");
                 System.out.println("3. Work with borrowings");
                 System.out.println("4. Show borrowing information using JOIN");
-                System.out.println("5. Exit");
+                System.out.println("5. Create Books table");
+                System.out.println("6. Create Members table");
+                System.out.println("7. Create Borrowings table");
+                System.out.println("8. Exit");
 
                 choice = scanner.nextInt();
                 switch (choice) {
@@ -41,6 +46,27 @@ public class Main {
                         showBorrowingInfoWithJoin(connection);
                         break;
                     case 5:
+                        if (!tableExists(connection, "Books")) {
+                            createBooksTable(connection);
+                        } else {
+                            System.out.println("Books table already exists.");
+                        }
+                        break;
+                    case 6:
+                        if (!tableExists(connection, "Members")) {
+                            createMembersTable(connection);
+                        } else {
+                            System.out.println("Members table already exists.");
+                        }
+                        break;
+                    case 7:
+                        if (!tableExists(connection, "Borrowings")) {
+                            createBorrowingsTable(connection);
+                        } else {
+                            System.out.println("Borrowings table already exists.");
+                        }
+                        break;
+                    case 8:
                         System.out.println("Exiting the program.");
                         System.exit(0);
                     default:
@@ -51,6 +77,74 @@ public class Main {
             e.printStackTrace();
         }
     }
+
+
+    public static void createBooksTable(Connection connection) {
+        String createBooksTableSQL = "CREATE TABLE Books ("
+                + "BookID SERIAL PRIMARY KEY, "
+                + "Title VARCHAR, "
+                + "Author VARCHAR, "
+                + "Genre VARCHAR, "
+                + "YearPublished INT"
+                + ");";
+
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(createBooksTableSQL);
+            System.out.println("Books table created successfully.");
+        } catch (SQLException e) {
+            System.out.println("Error creating Books table: " + e.getMessage());
+        }
+    }
+
+    public static void createMembersTable(Connection connection) {
+        String createMembersTableSQL = "CREATE TABLE Members ("
+                + "MemberID SERIAL PRIMARY KEY, "
+                + "Name VARCHAR, "
+                + "membership_type VARCHAR, "
+                + "JoinDate DATE"
+                + ");";
+
+        try (Statement statement = connection.createStatement()) {
+
+            statement.execute(createMembersTableSQL);
+            System.out.println("Members table created successfully.");
+        } catch (SQLException e) {
+            System.out.println("Error creating Members table: " + e.getMessage());
+        }
+    }
+
+    public static void createBorrowingsTable(Connection connection) {
+        String createBorrowingsTableSQL = "CREATE TABLE Borrowings ("
+                + "BorrowingID SERIAL PRIMARY KEY, "
+                + "BookID INT, "
+                + "MemberID INT, "
+                + "BorrowDate DATE, "
+                + "ReturnDate DATE, "
+                + "FOREIGN KEY (BookID) REFERENCES Books (BookID), "
+                + "FOREIGN KEY (MemberID) REFERENCES Members (MemberID)"
+                + ");";
+
+        try (Statement statement = connection.createStatement()) {
+
+            statement.execute(createBorrowingsTableSQL);
+            System.out.println("Borrowings table created successfully.");
+        } catch (SQLException e) {
+            System.out.println("Error creating Borrowings table: " + e.getMessage());
+        }
+    }
+
+    public static boolean tableExists(Connection connection, String tableName) {
+        try {
+            DatabaseMetaData metaData = connection.getMetaData();
+            ResultSet resultSet = metaData.getTables(null, null, tableName, null);
+            return resultSet.next();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
 
     public static void showBorrowingInfoWithJoin(Connection connection) {
         try {
@@ -291,6 +385,7 @@ public class Main {
     }
 
     public static void addMember(Connection connection, Scanner scanner) {
+
         try {
             System.out.println("Enter the name of the new library member:");
             String name = scanner.nextLine();
@@ -298,15 +393,28 @@ public class Main {
             System.out.println("Enter the membership type:");
             String membershipType = scanner.nextLine();
 
+            System.out.println("Enter join date (YYYY-MM-DD) or press Enter for current date:");
+            String joinDateInput = scanner.nextLine();
 
-            Date currentDate = new Date(System.currentTimeMillis());
-
+            Date joinDate = null;
+            if (joinDateInput.isEmpty()) {
+                joinDate = new Date(System.currentTimeMillis());
+            } else {
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+                try {
+                    java.util.Date parsedDate = dateFormat.parse(joinDateInput);
+                    joinDate = new Date(parsedDate.getTime());
+                } catch (ParseException e) {
+                    System.out.println("Invalid date format. Using current date instead.");
+                    joinDate = new Date(System.currentTimeMillis());
+                }
+            }
 
             String query = "INSERT INTO members (name, membership_type, join_date) VALUES (?, ?, ?)";
             PreparedStatement preparedStatement = connection.prepareStatement(query);
             preparedStatement.setString(1, name);
             preparedStatement.setString(2, membershipType);
-            preparedStatement.setDate(3, currentDate);
+            preparedStatement.setDate(3, joinDate);
 
             int rowsInserted = preparedStatement.executeUpdate();
             if (rowsInserted > 0) {
@@ -317,6 +425,7 @@ public class Main {
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
+
     }
 
     public static void updateMember(Connection connection, Scanner scanner) {
